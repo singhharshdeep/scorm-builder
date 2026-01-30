@@ -1,40 +1,67 @@
 // src/utils/compiler.ts
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import scormBridgeSource from "../templates/ScormBridge.js?raw";
 
-import type { CourseData } from '../types/scorm';
-import { generateManifest } from './generators';
+import type { CourseData } from "../types/scorm";
+import { generateManifest } from "./generators";
 
-export const compileScorm = async (data: CourseData) => {
+export const compileScorm = async (course: CourseData) => {
   const zip = new JSZip();
 
   // 1. Add the Manifest
-  zip.file("imsmanifest.xml", generateManifest(data));
+  zip.file("imsmanifest.xml", generateManifest(course));
 
+  zip.file("scorm-bridge.js", scormBridgeSource);
   // 2. Add the Course Data (for the player to read)
-  zip.folder("assets")?.file("course-data.json", JSON.stringify(data));
+  zip.folder("assets")?.file("course-data.json", JSON.stringify(course));
 
   // 3. Add the Player Shell (Standard HTML/JS)
-  zip.file("index.html", `
+  zip.file(
+    "index.html",
+    `
     <!DOCTYPE html>
     <html>
-      <head><title>${data.title}</title></head>
-      <body>
-        <div id="player-root">Loading...</div>
+      <head>
+        <title>${course.title}</title>
+        <script src="scorm-bridge.js"></script>
+      </head>
+      <body onload="ScormBridge.init()" onunload="ScormBridge.finish()">
+        <div id="ui">
+          <h1>${course.title}</h1>
+          <div id="slide-content"></div>
+          <button id="next-btn">Next Slide</button>
+        </div>
+
         <script>
-            // We'll build the real player in Sprint 2
-            fetch('assets/course-data.json')
-              .then(r => r.json())
-              .then(data => {
-                document.getElementById('player-root').innerHTML = '<h1>' + data.title + '</h1>';
-                console.log("SCORM Course Initialized", data);
-              });
+          const slides = ${JSON.stringify(course.slides)};
+          let currentIdx = 0;
+
+          function render() {
+            const slide = slides[currentIdx];
+            document.getElementById('slide-content').innerHTML = '<h2>' + slide.title + '</h2>' + slide.content;
+            
+            // If it's the last slide, change button to 'Finish'
+            if (currentIdx === slides.length - 1) {
+              const btn = document.getElementById('next-btn');
+              btn.innerText = "Finish Course";
+              btn.onclick = () => ScormBridge.finish();
+            }
+          }
+
+          document.getElementById('next-btn').onclick = () => {
+            currentIdx++;
+            render();
+          };
+
+          render();
         </script>
       </body>
     </html>
-  `);
+  `,
+  );
 
   // 4. Export the ZIP
   const content = await zip.generateAsync({ type: "blob" });
-  saveAs(content, `${data.id}_package.zip`);
+  saveAs(content, `${course.id}_package.zip`);
 };
