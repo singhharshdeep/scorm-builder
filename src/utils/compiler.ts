@@ -1,7 +1,7 @@
-// src/utils/compiler.ts
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import scormBridgeSource from "../templates/ScormBridge.js?raw";
+import { marked } from 'marked';
 
 import type { CourseData } from "../types/scorm";
 import { generateManifest } from "./generators";
@@ -9,12 +9,20 @@ import { generateManifest } from "./generators";
 export const compileScorm = async (course: CourseData) => {
   const zip = new JSZip();
 
+  const processedSlides = course.slides.map(slide => ({
+    ...slide,
+    body: marked.parse(slide.content) // Converts MD -> HTML string
+  }));
+
+  // Create a version of the config with HTML bodies
+  const runtimeConfig = { ...course, slides: processedSlides };
+
   // 1. Add the Manifest
   zip.file("imsmanifest.xml", generateManifest(course));
 
   zip.file("scorm-bridge.js", scormBridgeSource);
   // 2. Add the Course Data (for the player to read)
-  zip.folder("assets")?.file("course-data.json", JSON.stringify(course));
+  zip.folder("assets")?.file("course-data.json", JSON.stringify(runtimeConfig));
 
   // 3. Add the Player Shell (Standard HTML/JS)
   zip.file(
