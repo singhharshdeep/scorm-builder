@@ -1,18 +1,36 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import scormBridgeSource from "../templates/ScormBridge.js?raw";
-import { marked } from 'marked';
+import { marked } from "marked";
 
 import type { CourseData } from "../types/scorm";
 import { generateManifest } from "./generators";
 
 export const compileScorm = async (course: CourseData) => {
   const zip = new JSZip();
+  const assetsFolder = zip.folder("assets");
 
-  const processedSlides = course.slides.map(slide => ({
-    ...slide,
-    body: marked.parse(slide.content) // Converts MD -> HTML string
-  }));
+  // 1. Process slides and add media to the ZIP
+  const processedSlides = course.slides.map((slide) => {
+    let mediaHtml = "";
+
+    if (slide.media) {
+      // Add the actual file to the assets folder in the ZIP
+      assetsFolder?.file(slide.media.name, slide.media.file);
+
+      // Create the HTML tag for the player
+      mediaHtml =
+        slide.media.type === "image"
+          ? `<img src="assets/${slide.media.name}" style="max-width:100%; height:auto;" />`
+          : `<video controls src="assets/${slide.media.name}" style="max-width:100%;"></video>`;
+    }
+
+    return {
+      ...slide,
+      // Prepend or append media to the Markdown-converted body
+      body: mediaHtml + marked.parse(slide.content),
+    };
+  });
 
   // Create a version of the config with HTML bodies
   const runtimeConfig = { ...course, slides: processedSlides };

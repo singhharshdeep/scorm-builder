@@ -39,6 +39,16 @@ export default function App() {
     setActiveSlideId(newSlide.id);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeSlide) {
+      const type = file.type.startsWith("video/") ? "video" : "image";
+      updateSlide(activeSlide.id, {
+        media: { file, type, name: `${activeSlide.id}_${file.name}` },
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen w-full bg-slate-50 text-slate-900 font-sans">
       {/* Top Bar */}
@@ -118,6 +128,21 @@ export default function App() {
                   placeholder="<p>Enter HTML content here...</p>"
                 />
               </div>
+              <div className="mt-4 p-4 border rounded-lg bg-indigo-50/50">
+                <label className="block text-xs font-bold text-indigo-400 mb-2">
+                  ATTACH MEDIA
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleFileChange}
+                />
+                {activeSlide.media && (
+                  <p className="text-xs mt-2 text-indigo-600">
+                    Attached: {activeSlide.media.name}
+                  </p>
+                )}
+              </div>
               <div className="flex flex-col">
                 <label className="text-xs font-bold text-slate-400 mb-2">
                   PREVIEW
@@ -129,6 +154,17 @@ export default function App() {
                   }}
                 />
               </div>
+              {activeSlide.media && (
+                <div className="aspect-video bg-slate-100 border-b relative group">
+                  <img
+                    src={URL.createObjectURL(activeSlide.media.file)}
+                    className="w-full h-full object-contain"
+                  />
+                  <button className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-slate-400">
